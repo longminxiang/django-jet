@@ -123,7 +123,6 @@
         </div>
     {% endif %}
 
-    {% jet_get_side_menu_compact as SIDE_MENU_COMPACT %}
     {% if not is_popup %}
         <div class="related-popup-container scrollable">
             <a href="#" class="related-popup-back">
@@ -152,14 +151,6 @@
                             </span>
                         </a>
                     {% endif %}
-                    {% if site_url %}
-                        <a href="{{ site_url }}" class="sidebar-link icon">
-                            <span class="sidebar-link-label">
-                                <span class="sidebar-link-icon icon-open-external"></span>
-                                {% trans 'View site' %}
-                            </span>
-                        </a>
-                    {% endif %}
                     {% url 'django-admindocs-docroot' as docsroot %}
                     {% if docsroot %}
                         <a href="{{ docsroot }}" class="sidebar-link icon">
@@ -174,184 +165,83 @@
 
                 {% if user.is_active and user.is_staff %}
                     {% jet_get_menu as app_list %}
-                    {% if app_list.apps or app_list.pinned_apps %}
-                        {% if SIDE_MENU_COMPACT %}
-                            {% for app in app_list.all_apps %}
-                                <div class="sidebar-section">
-                                    <div class="sidebar-title">
-                                        <a href="{{ app.app_url }}" class="sidebar-title-link">
-                                            {% if app.name != app.app_label|capfirst|escape %}
-                                                {{ app.name }}
-                                            {% else %}
-                                                {% trans app.app_label as app_label %}{{ app_label|capfirst|escape }}
-                                            {% endif %}
-                                        </a>
-                                    </div>
-                                    {% for model in app.models %}
-                                        {% if model.admin_url %}
-                                            <div>
-                                                <a href="{{ model.admin_url }}" class="sidebar-link">
-                                                    <span class="sidebar-right">
-                                                        <span class="sidebar-right-arrow icon-arrow-right"></span>
-                                                    </span>
-                                                    <span class="sidebar-link-label">{{ model.name }}</span>
-                                                </a>
-                                            </div>
-                                        {% endif %}
-                                    {% endfor %}
-                                </div>
-                            {% endfor %}
-                        {% else %}
-                            <form action="{% url "jet:toggle_application_pin" %}" method="POST" id="toggle-application-pin-form">
-                                {% csrf_token %}
-                                <input type="hidden" name="app_label">
-                            </form>
-
-                            <div class="sidebar-section">
-                                <div class="sidebar-title">
-                                    <span class="sidebar-right">
-                                        <a href="#" class="sidebar-right-edit edit-apps-list"><span class="icon-settings"></span></a>
-                                    </span>
-                                    {% trans 'Applications' %}
-                                </div>
-
-                                <div class="apps-list-pinned">
-                                    {% for app in app_list.pinned_apps %}
-                                        <a href="{{ app.app_url }}" class="sidebar-link popup-section-link app-item" data-app-label="{{ app.app_label }}" data-popup-section-class="sidebar-popup-section-{{ app.app_label }}">
-                                            <span class="sidebar-left collapsible">
-                                                <span class="sidebar-left-pin icon-star pin-toggle"></span>
-                                                <span class="sidebar-left-unpin icon-cross pin-toggle"></span>
-                                            </span>
-
-                                            <span class="sidebar-right">
-                                                <span class="sidebar-right-arrow icon-arrow-right"></span>
-                                            </span>
-
-                                            <span class="sidebar-link-label">
-                                                {% if app.name != app.app_label|capfirst|escape %}
-                                                    {{ app.name }}
-                                                {% else %}
-                                                    {% trans app.app_label as app_label %}{{ app_label|capfirst|escape }}
-                                                {% endif %}
-                                            </span>
-                                        </a>
-                                    {% endfor %}
-                                </div>
-                                <a href="#" class="sidebar-center-link apps-hide">
-                                    <span class="apps-hide-label apps-visible">{% trans "Hide applications" %}</span>
-                                    <span class="apps-hide-label apps-hidden">{% trans "Show hidden" %}</span>
-                                </a>
-                                <div class="apps-list">
-                                    {% for app in app_list.apps %}
-                                        <a href="{{ app.app_url }}" class="sidebar-link popup-section-link app-item" data-app-label="{{ app.app_label }}" data-popup-section-class="sidebar-popup-section-{{ app.app_label }}">
-                                            <span class="sidebar-left collapsible">
-                                                <span class="sidebar-left-pin icon-star pin-toggle"></span>
-                                                <span class="sidebar-left-unpin icon-cross pin-toggle"></span>
-                                            </span>
-
-                                            <span class="sidebar-right">
-                                                <span class="sidebar-right-arrow icon-arrow-right"></span>
-                                            </span>
-
-                                            <span class="sidebar-link-label">
-                                                {% if app.name != app.app_label|capfirst|escape %}
-                                                    {{ app.name }}
-                                                {% else %}
-                                                    {% trans app.app_label as app_label %}{{ app_label|capfirst|escape }}
-                                                {% endif %}
-                                            </span>
-                                        </a>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                        {% endif %}
-                    {% endif %}
-
-                    <div class="sidebar-section last">
-                        <div class="dialog-confirm" id="bookmarks-add-dialog" title="{% trans "Add bookmark" %}">
-                            <form action="{% url "jet:add_bookmark" %}" method="POST" id="bookmarks-add-form">
-                                {% csrf_token %}
-                                <p>{% trans "Title" %}:</p>
-                                <input type="text" name="title" class="fill_width">
-                                <p>{% trans "URL" %}:</p>
-                                <input type="text" name="url" class="fill_width">
-                            </form>
-                        </div>
-                        <form action="{% url "jet:remove_bookmark" %}" method="POST" id="bookmarks-remove-form">
-                            {% csrf_token %}
-                            <input type="hidden" name="id">
-                        </form>
-                        <div class="dialog-confirm" id="bookmarks-remove-dialog" title="{% trans "Delete bookmark" %}">
-                            <p>{% trans "Are you sure want to delete this bookmark?" %}</p>
-                        </div>
-
-                        <div class="sidebar-title">
-                            <span class="sidebar-right">
-                                <a href="#" class="sidebar-right-plus bookmarks-add" title="{% trans "Add bookmark" %}"{% if title %} data-title="{{ title }}"{% endif %}><span class="icon-add"></span></a>
-                            </span>
-                            {% trans 'bookmarks' %}
-                        </div>
-
-                        <div class="bookmarks-list">
-                            {% jet_get_bookmarks user as bookmarks %}
-                            {% for bookmark in bookmarks %}
-                                <a href="{{ bookmark.url }}" class="sidebar-link bookmark-item">
-                                    <span class="sidebar-right collapsible">
-                                        <span class="sidebar-right-remove bookmarks-remove" data-bookmark-id="{{ bookmark.pk }}">{% trans "Remove" %}</span>
-                                    </span>
-                                    <span class="sidebar-link-label">{{ bookmark.title }}</span>
-                                </a>
-                            {% endfor %}
-                            <a class="sidebar-link bookmark-item clone">
-                                <span class="sidebar-right collapsible">
-                                    <span class="sidebar-right-remove bookmarks-remove">{% trans "Remove" %}</span>
+                    {% if app_list.apps %}
+                    <ul class="sidebar-menu">
+                        {% for app in app_list.apps %}
+                        <li class="treeview
+                        {% if cl.opts.app_label == app.app_label %}
+                        active
+                        {% elif opts.app_label == app.app_label %}
+                        active
+                        {% endif %}"
+                        >
+                            <a href="#">
+                                <span>
+                                {% if app.name != app.app_label|capfirst|escape %}
+                                    {{ app.name }}
+                                {% else %}
+                                    {% trans app.app_label as app_label %}{{ app_label|capfirst|escape }}
+                                {% endif %}
                                 </span>
-                                <span class="sidebar-link-label"></span>
+                                <span class="sidebar-right icon-arrow-right fa-angle-left"></span>
                             </a>
-                        </div>
-                    </div>
+                            <ul class="treeview-menu">
+                                {% for model in app.models %}
+                                <li class="sidebar-popup-list-item model-{{ model.object_name|lower }}{{ model.current|yesno:" current," }}">
+                                    <a href="{{ model.admin_url }}">{{ model.name }}</a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                    {% endif %}
                 {% endif %}
-            </div>
-            <div class="sidebar-copyright">powered by DJANGO JET</div>
+                <div class="sidebar-section last">
+                    <div class="dialog-confirm" id="bookmarks-add-dialog" title="{% trans "Add bookmark" %}">
+                        <form action="{% url "jet:add_bookmark" %}" method="POST" id="bookmarks-add-form">
+                            {% csrf_token %}
+                            <p>{% trans "Title" %}:</p>
+                            <input type="text" name="title" class="fill_width">
+                            <p>{% trans "URL" %}:</p>
+                            <input type="text" name="url" class="fill_width">
+                        </form>
+                    </div>
+                    <form action="{% url "jet:remove_bookmark" %}" method="POST" id="bookmarks-remove-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="id">
+                    </form>
+                    <div class="dialog-confirm" id="bookmarks-remove-dialog" title="{% trans "Delete bookmark" %}">
+                        <p>{% trans "Are you sure want to delete this bookmark?" %}</p>
+                    </div>
 
-            {% if app_list and not SIDE_MENU_COMPACT %}
-                <div class="sidebar-popup-container">
-                    <div class="sidebar-popup scrollable">
-                        <a href="#" class="sidebar-close sidebar-back">
-                            <span class="sidebar-close-icon icon-arrow-left"></span>
-                        </a>
-                        {% for app in app_list.apps|add:app_list.pinned_apps %}
-                            <div class="sidebar-popup-section sidebar-popup-section-{{ app.app_label }}">
-                                <div class="sidebar-popup-title">
-                                    {% if app.name != app.app_label|capfirst|escape %}
-                                        {{ app.name }}
-                                    {% else %}
-                                        {% trans app.app_label as app_label %}{{ app_label|capfirst|escape }}
-                                    {% endif %}
-                                </div>
+                    <div class="sidebar-title">
+                        <span class="sidebar-right">
+                            <a href="#" class="sidebar-right-plus bookmarks-add" title="{% trans "Add bookmark" %}"{% if title %} data-title="{{ title }}"{% endif %}><span class="icon-add"></span></a>
+                        </span>
+                        书签
+                    </div>
 
-                                <input class="sidebar-popup-search" placeholder="Search...">
-
-                                <ul class="sidebar-popup-list">
-                                    <li class="sidebar-popup-list-item app-{{ app.app_label }}{{ app.current|yesno:" current," }}">
-                                        <a href="{{ app.app_url }}" class="sidebar-popup-list-item-link">{% trans 'Application page' %}</a>
-                                    </li>
-
-                                    {% for model in app.models %}
-                                        <li class="sidebar-popup-list-item model-{{ model.object_name|lower }}{{ model.current|yesno:" current," }}">
-                                            {% if model.admin_url %}
-                                                <a href="{{ model.admin_url }}" class="sidebar-popup-list-item-link">{{ model.name }}</a>
-                                            {% else %}
-                                                {{ model.name }}
-                                            {% endif %}
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
+                    <div class="bookmarks-list">
+                        {% jet_get_bookmarks user as bookmarks %}
+                        {% for bookmark in bookmarks %}
+                            <a href="{{ bookmark.url }}" class="sidebar-link bookmark-item">
+                                <span class="sidebar-right collapsible">
+                                    <span class="sidebar-right-remove bookmarks-remove" data-bookmark-id="{{ bookmark.pk }}">{% trans "Remove" %}</span>
+                                </span>
+                                <span class="sidebar-link-label">{{ bookmark.title }}</span>
+                            </a>
                         {% endfor %}
+                        <a class="sidebar-link bookmark-item clone">
+                            <span class="sidebar-right collapsible">
+                                <span class="sidebar-right-remove bookmarks-remove">{% trans "Remove" %}</span>
+                            </span>
+                            <span class="sidebar-link-label"></span>
+                        </a>
                     </div>
                 </div>
-            {% endif %}
+            </div>
+            <div class="sidebar-copyright">powered by SMARTSCREEN</div>
         </div>
     {% endif %}
 

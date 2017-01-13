@@ -83,11 +83,7 @@ def jet_get_menu(context):
 
     current_found = False
 
-    pinned = PinnedApplication.objects.filter(user=context.get('user').pk).values_list('app_label', flat=True)
-
-    all_aps = []
     apps = []
-    pinned_apps = []
 
     for app in app_list:
         if not current_found:
@@ -101,14 +97,9 @@ def jet_get_menu(context):
                 app['current'] = True
                 current_found = True
 
-        if app.get('app_label', app.get('name')) in pinned:
-            pinned_apps.append(app)
-        else:
-            apps.append(app)
+        apps.append(app)
 
-        all_aps.append(app)
-
-    return {'apps': apps, 'pinned_apps': pinned_apps, 'all_apps': all_aps}
+    return {'apps': apps}
 
 
 @register.assignment_tag
