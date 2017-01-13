@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import json
+import os
 from django import template
 from django.core.urlresolvers import reverse
 from django.forms import CheckboxInput, ModelChoiceField, Select, ModelMultipleChoiceField, SelectMultiple
@@ -7,8 +8,15 @@ from django.contrib.admin.widgets import RelatedFieldWidgetWrapper
 from django.utils.formats import get_format
 from django.utils.safestring import mark_safe
 from django.utils.encoding import smart_text
-from ..import settings
-from ..utils import get_app_list, get_model_instance_label, get_admin_site
+from jet import settings, VERSION
+from jet.models import Bookmark, PinnedApplication
+from jet.utils import get_app_list, get_model_instance_label, get_model_queryset, get_possible_language_codes, \
+    get_admin_site
+
+try:
+    from urllib.parse import parse_qsl
+except ImportError:
+    from urlparse import parse_qsl
 
 
 register = template.Library()
@@ -75,7 +83,11 @@ def jet_get_menu(context):
 
     current_found = False
 
+    pinned = PinnedApplication.objects.filter(user=context.get('user').pk).values_list('app_label', flat=True)
+
+    all_aps = []
     apps = []
+    pinned_apps = []
 
     for app in app_list:
         if not current_found:
@@ -89,9 +101,21 @@ def jet_get_menu(context):
                 app['current'] = True
                 current_found = True
 
-        apps.append(app)
+        if app.get('app_label', app.get('name')) in pinned:
+            pinned_apps.append(app)
+        else:
+            apps.append(app)
 
-    return {'apps': apps}
+        all_aps.append(app)
+
+    return {'apps': apps, 'pinned_apps': pinned_apps, 'all_apps': all_aps}
+
+
+@register.assignment_tag
+def jet_get_bookmarks(user):
+    if user is None:
+        return None
+    return Bookmark.objects.filter(user=user.pk)
 
 
 @register.filter
@@ -105,6 +129,7 @@ def jet_select2_lookups(field):
             (isinstance(field.field, ModelChoiceField) or isinstance(field.field, ModelMultipleChoiceField)):
         qs = field.field.queryset
         model = qs.model
+
         if getattr(model, 'autocomplete_search_fields', None) and getattr(field.field, 'autocomplete', True):
             choices = []
             app_label = model._meta.app_label
@@ -116,6 +141,7 @@ def jet_select2_lookups(field):
                 'data-model': model_name,
                 'data-ajax--url': reverse('jet:model_lookup')
             }
+
             form = field.form
             initial_value = form.data.get(field.name) if form.data != {} else form.initial.get(field.name)
 
@@ -148,6 +174,101 @@ def jet_select2_lookups(field):
 
 
 @register.assignment_tag(takes_context=True)
+def jet_get_current_theme(context):
+    if 'request' in context and 'JET_THEME' in context['request'].COOKIES:
+        theme = context['request'].COOKIES['JET_THEME']
+        if isinstance(settings.JET_THEMES, list) and len(settings.JET_THEMES) > 0:
+            for conf_theme in settings.JET_THEMES:
+                if isinstance(conf_theme, dict) and conf_theme.get('theme') == theme:
+                    return theme
+    return settings.JET_DEFAULT_THEME
+
+
+@register.assignment_tag
+def jet_get_themes():
+    return settings.JET_THEMES
+
+
+@register.assignment_tag
+def jet_get_current_version():
+    return VERSION
+
+
+@register.filter
+def jet_append_version(url):
+    if '?' in url:
+        return '%s&v=%s' % (url, VERSION)
+    else:
+        return '%s?v=%s' % (url, VERSION)
+
+
+@register.assignment_tag
+def jet_get_side_menu_compact():
+    return settings.JET_SIDE_MENU_COMPACT
+
+
+@register.assignment_tag
+def jet_change_form_sibling_links_enabled():
+    return settings.JET_CHANGE_FORM_SIBLING_LINKS
+
+
+def jet_sibling_object_url(context, next):
+    original = context.get('original')
+
+    if not original:
+        return
+
+    model = type(original)
+    preserved_filters_plain = context.get('preserved_filters', '')
+    preserved_filters = dict(parse_qsl(preserved_filters_plain))
+    admin_site = get_admin_site(context)
+
+    if admin_site is None:
+        return
+
+    request = context.get('request')
+    queryset = get_model_queryset(admin_site, model, request, preserved_filters=preserved_filters)
+
+    if queryset is None:
+        return
+
+    sibling_object = None
+    object_pks = list(queryset.values_list('pk', flat=True))
+
+    try:
+        index = object_pks.index(original.pk)
+        sibling_index = index + 1 if next else index - 1
+        exists = sibling_index < len(object_pks) if next else sibling_index >= 0
+        sibling_object = queryset.get(pk=object_pks[sibling_index]) if exists else None
+    except ValueError:
+        pass
+
+    if sibling_object is None:
+        return
+
+    url = reverse('%s:%s_%s_change' % (
+        admin_site.name,
+        model._meta.app_label,
+        model._meta.model_name
+    ), args=(sibling_object.pk,))
+
+    if preserved_filters_plain != '':
+        url += '?' + preserved_filters_plain
+
+    return url
+
+
+@register.assignment_tag(takes_context=True)
+def jet_previous_object_url(context):
+    return jet_sibling_object_url(context, False)
+
+
+@register.assignment_tag(takes_context=True)
+def jet_next_object_url(context):
+    return jet_sibling_object_url(context, True)
+
+
+@register.assignment_tag(takes_context=True)
 def jet_popup_response_data(context):
     if context.get('popup_response_data'):
         return context['popup_response_data']
@@ -165,3 +286,28 @@ def jet_delete_confirmation_context(context):
     if context.get('deletable_objects') is None and context.get('deleted_objects') is None:
         return ''
     return mark_safe('<div class="delete-confirmation-marker"></div>')
+
+
+@register.assignment_tag
+def jet_static_translation_urls():
+    language_codes = get_possible_language_codes()
+
+    urls = []
+    url_templates = [
+        'jet/js/i18n/jquery-ui/datepicker-__LANGUAGE_CODE__.js',
+        'jet/js/i18n/jquery-ui-timepicker/jquery.ui.timepicker-__LANGUAGE_CODE__.js',
+        'jet/js/i18n/select2/__LANGUAGE_CODE__.js'
+    ]
+
+    static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
+
+    for tpl in url_templates:
+        for language_code in language_codes:
+            url = tpl.replace('__LANGUAGE_CODE__', language_code)
+            path = os.path.join(static_dir, url)
+
+            if os.path.exists(path):
+                urls.append(url)
+                break
+
+    return urls
